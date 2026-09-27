@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Game List</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --felt:#1c2b22; --felt-2:#233529; --parchment:#f1e8d3; --parchment-2:#e7dab8;
+    --ink:#241f16; --brass:#c8973f; --line: rgba(36,31,22,.18);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+  body{
+    margin:0; background:var(--felt);
+    background-image: radial-gradient(circle at 20% 10%, var(--felt-2), var(--felt) 60%);
+    color:var(--parchment); font-family:'Inter',system-ui,sans-serif;
+    -webkit-text-size-adjust:100%;
+    min-height:100vh;
+  }
+  .tabs{
+    display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center;
+    padding: 1.5rem 1rem 1rem; max-width:64rem; margin:0 auto;
+  }
+  .tab{
+    font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:1rem;
+    background: transparent; color: var(--parchment); border:1px solid rgba(241,232,211,.35);
+    border-radius: 999px; padding:.5rem 1.1rem; cursor:pointer;
+  }
+  .tab[aria-selected="true"]{ background:var(--brass); border-color:var(--brass); color:#1c1608; }
+  .tab .count{ opacity:.7; font-family:'Inter',system-ui,sans-serif; font-weight:500; font-size:.82em; margin-left:.3em;}
+  .tab[aria-selected="true"] .count{ opacity:.6; }
+
+  main{ max-width: 64rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+  .grid{
+    display:grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr));
+    gap: 1rem; align-items: stretch;
+  }
+  .card{
+    position:relative;
+    background: var(--parchment); color: var(--ink);
+    border-radius: 14px; padding: 1.05rem 1.1rem 1.15rem;
+    box-shadow: 0 6px 18px rgba(0,0,0,.28);
+    display:flex; flex-direction:column; gap:.55rem;
+    border: 1px solid var(--parchment-2);
+    height:100%;
+  }
+  .star{
+    position:absolute; top:.6rem; right:.65rem; font-size:1.15rem; line-height:1;
+    color:var(--brass); filter: drop-shadow(0 1px 1px rgba(0,0,0,.25));
+  }
+  .card h3{
+    font-family:'Fraunces',Georgia,serif; font-size:1.15rem; margin:0; line-height:1.2;
+    padding-right:1.3rem;
+  }
+  .card h3 a{ color:inherit; text-decoration:none; border-bottom:1px dotted rgba(36,31,22,.4); }
+  .card h3 a:hover{ border-bottom-style:solid; }
+  .badges{ display:flex; flex-wrap:wrap; gap:.4rem; }
+  .badge{
+    font-size:.72rem; font-weight:600; padding:.22rem .55rem; border-radius:999px;
+    display:inline-flex; align-items:center; gap:.3em; white-space:nowrap;
+  }
+  .b-simple{ background:#dcead9; color:#355c2f; }
+  .b-medium{ background:#f6e3bd; color:#7a520f; }
+  .b-complex{ background:#f3d3c9; color:#8a3a20; }
+  .b-verycomplex{ background:#e3c3e8; color:#5c2168; }
+  .b-time-quick{ background:#cfe8de; color:#1f5c42; }
+  .b-time-medium{ background:#f6dfae; color:#7a5210; }
+  .b-time-long{ background:#e6c2c2; color:#7a2222; }
+  .b-coop{ background:#d8e8ea; color:#1f5c62; }
+  .b-comp{ background:#efd9df; color:#7a2b45; }
+  .b-semi{ background:#e6dfce; color:#5f5230; }
+  .dots{ letter-spacing:.1em; }
+  .bottom-block{ margin-top:auto; display:flex; flex-direction:column; gap:.55rem; }
+  .tags{ font-size:.83rem; color:#4b4535; }
+  .theme{ font-size:.86rem; color:#4e4835; font-style:italic; line-height:1.45; border-bottom:1px dashed var(--line); padding-bottom:.55rem; }
+
+  .status{
+    max-width:40rem; margin: 2rem auto; padding: 1rem 1.2rem; text-align:center;
+    color: rgba(241,232,211,.75); font-size:.95rem; line-height:1.5;
+  }
+  .status.error{ background:#5c2020; color:#fbdede; border-radius:10px; text-align:left; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+
+<div class="tabs" role="tablist" aria-label="Player count"></div>
+<main>
+  <div id="status" class="status">Loading games&hellip;</div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<script>
+/* The game list lives in games.json (same folder as this file). Edit that file to change the list. */
+const DATA_URL = "games.json";
+
+const MODE_LABEL = {coop:["Cooperative","b-coop"], comp:["Competitive","b-comp"], semi:["One vs many","b-semi"]};
+const COMPLEXITY_DOTS = {simple:"\u25cf\u25cb\u25cb\u25cb", medium:"\u25cf\u25cf\u25cb\u25cb", complex:"\u25cf\u25cf\u25cf\u25cb", verycomplex:"\u25cf\u25cf\u25cf\u25cf"};
+const COMPLEXITY_CLASS = {simple:"b-simple", medium:"b-medium", complex:"b-complex", verycomplex:"b-verycomplex"};
+const COMPLEXITY_LABEL = {simple:"simple", medium:"medium", complex:"complex", verycomplex:"very complex"};
+const TIME_CLASS = {quick:"b-time-quick", medium:"b-time-medium", long:"b-time-long"};
+const TIME_LABEL = {quick:"Quick", medium:"Medium", long:"Long"};
+
+let GAMES = [];
+let counts = [];
+let currentCount = null;
+const tabsEl = document.querySelector('.tabs');
+const gridEl = document.getElementById('grid');
+const statusEl = document.getElementById('status');
+
+function classifyDuration(mins){
+  if(mins <= 45) return "quick";
+  if(mins >= 120) return "long";
+  return "medium";
+}
+function formatDuration(mins){
+  let text;
+  if(mins < 60){ text = mins + " mins"; }
+  else {
+    const hrs = Math.round((mins / 60) * 100) / 100;
+    text = hrs + " hour" + (hrs === 1 ? "" : "s");
+  }
+  return { text, category: classifyDuration(mins) };
+}
+function esc(s){
+  return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function inRange(g, n){ return n >= g.range[0] && n <= g.range[1]; }
+
+function cardHTML(g, count){
+  const [modeLabel, modeClass] = MODE_LABEL[g.mode] || MODE_LABEL.comp;
+  const isBest = (g.best || []).includes(count);
+  const dur = formatDuration(g.durationMins || 0);
+  const nameHTML = g.bgg
+    ? `<a href="${esc(g.bgg)}" target="_blank" rel="noopener">${esc(g.name)}</a>`
+    : esc(g.name);
+  return `<article class="card">
+    ${isBest ? `<span class="star" title="Best at this count">\u2605</span>` : ''}
+    <h3>${nameHTML}</h3>
+    <div class="badges">
+      <span class="badge ${COMPLEXITY_CLASS[g.complexity]}"><span class="dots">${COMPLEXITY_DOTS[g.complexity]}</span> ${COMPLEXITY_LABEL[g.complexity]}</span>
+      <span class="badge ${TIME_CLASS[dur.category]}">${TIME_LABEL[dur.category]} \u00b7 ${dur.text}</span>
+      <span class="badge ${modeClass}">${modeLabel}</span>
+    </div>
+    <div class="bottom-block">
+      <div class="theme">${esc(g.theme)}</div>
+      <div class="tags">${esc(g.tags)}</div>
+    </div>
+  </article>`;
+}
+
+function render(count){
+  currentCount = count;
+  const list = GAMES.filter(g => inRange(g, count));
+  list.sort((a,b) => {
+    const aBest = (a.best||[]).includes(count) ? 1 : 0;
+    const bBest = (b.best||[]).includes(count) ? 1 : 0;
+    if(aBest !== bBest) return bBest - aBest;
+    return (b.rating||0) - (a.rating||0);
+  });
+  gridEl.innerHTML = list.map(g => cardHTML(g, count)).join('');
+}
+
+function buildTabs(){
+  counts = [...new Set(GAMES.flatMap(g => {
+    const arr = [];
+    for(let n = g.range[0]; n <= Math.min(g.range[1], 8); n++) arr.push(n);
+    return arr;
+  }))].sort((a,b)=>a-b);
+  currentCount = counts[0];
+  tabsEl.innerHTML = counts.map(c => {
+    const n = GAMES.filter(g => inRange(g, c)).length;
+    const label = (c === 8 && GAMES.some(g => g.range[1] > 8)) ? '8+' : c;
+    return `<button class="tab" role="tab" aria-selected="${c===currentCount}" data-count="${c}">${label} player${c>1?'s':''} <span class="count">(${n})</span></button>`;
+  }).join('');
+  tabsEl.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabsEl.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected','false'));
+      btn.setAttribute('aria-selected','true');
+      render(parseInt(btn.dataset.count, 10));
+    });
+  });
+}
+
+async function init(){
+  try{
+    // Cache-buster so friends always get the latest list after you update games.json
+    const res = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if(!res.ok) throw new Error("HTTP " + res.status + " while loading " + DATA_URL);
+    const data = await res.json();
+    if(!Array.isArray(data) || !data.length) throw new Error("games.json is empty or not a list.");
+    GAMES = data;
+    statusEl.style.display = "none";
+    buildTabs();
+    render(currentCount);
+  }catch(e){
+    statusEl.className = "status error";
+    statusEl.textContent = "Couldn't load the game list.\n\n" + e.message +
+      "\n\nMake sure games.json sits in the same folder as this page, and that the page is opened from a web address (not by double-clicking the file).";
+  }
+}
+init();
+</script>
+</body>
+</html>
