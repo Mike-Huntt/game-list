@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game List Manager</title>
+<style>
+  :root{ --bg:#1c2b22; --parchment:#f1e8d3; --parchment-2:#e7dab8; --ink:#241f16; --brass:#c8973f; --muted:#8a7f60; --danger:#a6532e; }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--parchment); }
+  header{ display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1.1rem 1.2rem; border-bottom:1px solid rgba(241,232,211,.15); }
+  h1{ margin:0; font-size:1.4rem; }
+  .open-link{ text-decoration:none; font-weight:600; font-size:.85rem; color:#1c1608; background:var(--brass); border-radius:999px; padding:.5rem 1.1rem; white-space:nowrap; }
+
+  .layout{
+    display:grid; gap:1rem; padding:1rem 1.2rem 3rem; max-width:80rem; margin:0 auto;
+    grid-template-columns: 22rem 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "actions edit"
+      "list    edit"
+      "gh      edit";
+  }
+  .layout > .box{ align-self:start; }
+  #actionsBox{ grid-area:actions; } #listBox{ grid-area:list; } #editBox{ grid-area:edit; } #ghBox{ grid-area:gh; }
+  @media (max-width: 860px){
+    .layout{
+      grid-template-columns: 1fr; grid-template-rows:none;
+      grid-template-areas: "actions" "list" "edit" "gh";
+    }
+  }
+
+  .box{ background:var(--parchment); color:var(--ink); border-radius:12px; padding:1rem; }
+  .box h2{ margin:0 0 .6rem; font-size:1.05rem; }
+  .toolbar{ display:flex; flex-wrap:wrap; gap:.5rem; }
+  .toolbar + .toolbar{ margin-top:.5rem; }
+  .btn{ font:inherit; font-weight:600; font-size:.82rem; cursor:pointer; border-radius:999px; padding:.5rem 1rem; border:1px solid transparent; }
+  .btn-primary{ background:var(--brass); color:#1c1608; }
+  .btn-secondary{ background:transparent; border-color:var(--muted); color:#4b4535; }
+  .btn-danger{ background:transparent; border-color:var(--danger); color:var(--danger); }
+  .btn-small{ padding:.4rem .8rem; font-size:.78rem; }
+  input, select, textarea{ width:100%; font:inherit; font-size:.9rem; padding:.5rem .6rem; border-radius:8px; border:1px solid var(--parchment-2); background:#fbf6ea; color:var(--ink); }
+  textarea{ min-height:7.25rem; resize:vertical; }
+  label{ display:block; font-size:.76rem; font-weight:600; margin:.7rem 0 .25rem; color:#5a5236; }
+  .label-row{ display:flex; justify-content:space-between; align-items:baseline; gap:.6rem; margin-bottom:.25rem; }
+  .bgg-open{ font-size:.75rem; font-weight:600; color:#7a520f; text-decoration:none; }
+  .bgg-open:hover{ text-decoration:underline; }
+  .row{ display:flex; gap:.6rem; } .row > div{ flex:1; }
+  .hint{ font-size:.73rem; color:var(--muted); margin:.25rem 0 0; line-height:1.4; }
+  .list{ max-height:60vh; overflow-y:auto; }
+  .item{ padding:.45rem .3rem; border-bottom:1px dashed rgba(36,31,22,.18); font-size:.88rem; cursor:pointer; }
+  .item:last-child{ border-bottom:none; }
+  .item:hover{ text-decoration:underline; }
+  .item.active{ background:#f6e3bd; border-radius:6px; }
+  .empty{ font-size:.85rem; color:var(--muted); padding:.4rem 0; line-height:1.4; }
+  .status{ font-size:.8rem; color:var(--muted); margin-top:.6rem; min-height:1.2em; line-height:1.4; }
+  .status:empty{ display:none; }
+  #ghStatus{ min-height:2.8em; margin-top:.6rem; margin-bottom:.4rem; }
+  #ghStatus:empty{ display:block; }
+  .dirty{ color:var(--danger); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Game List Manager</h1>
+  <a class="open-link" id="openSite" href="#" target="_blank" rel="noopener">Open game list</a>
+</header>
+
+<div class="layout">
+
+  <div class="box" id="actionsBox">
+    <h2>Publish &amp; backup</h2>
+    <div class="toolbar">
+      <button class="btn btn-secondary btn-small" id="ghLoad">Load from GitHub</button>
+      <button class="btn btn-primary btn-small" id="ghPublish">Publish to GitHub</button>
+    </div>
+    <div class="status" id="ghStatus"></div>
+    <div class="toolbar">
+      <button class="btn btn-secondary btn-small" id="openBtn">Load json backup</button>
+      <button class="btn btn-secondary btn-small" id="downloadBtn">Save json backup</button>
+    </div>
+    <input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+    <div id="dirtyNote" class="status"></div>
+  </div>
+
+  <div class="box" id="listBox">
+    <h2>Games (<span id="count">0</span>)</h2>
+    <div class="list" id="list"></div>
+    <button class="btn btn-secondary btn-small" id="newBtn" style="margin-top:.7rem;">+ Add new game</button>
+  </div>
+
+  <div class="box" id="editBox">
+    <h2 id="formTitle">Add a game</h2>
+
+    <div class="label-row"><label style="margin:0">BoardGameGeek link</label><a class="bgg-open" href="https://boardgamegeek.com" target="_blank" rel="noopener">Open BoardGameGeek &#8599;</a></div>
+    <input id="f_bgg" placeholder="https://boardgamegeek.com/boardgame/...">
+
+    <label>Name</label>
+    <input id="f_name">
+
+    <div class="row">
+      <div><label>Min players</label><input id="f_min" type="number" min="1"></div>
+      <div><label>Max players</label><input id="f_max" type="number" min="1"></div>
+    </div>
+
+    <label>Best player counts (separated by commas)</label>
+    <input id="f_best" placeholder="3,4">
+
+    <div class="row">
+      <div>
+        <label>Complexity</label>
+        <select id="f_complexity">
+          <option value="simple">Simple</option>
+          <option value="medium">Medium</option>
+          <option value="complex">Complex</option>
+          <option value="verycomplex">Very complex</option>
+        </select>
+      </div>
+      <div><label>BGG rating</label><input id="f_rating" type="number" step="0.1" min="0" max="10"></div>
+    </div>
+
+    <label>Duration (minutes)</label>
+    <input id="f_duration" type="number" min="1" placeholder="e.g. 90">
+    <p class="hint" id="durPreview"></p>
+
+    <label>Mode</label>
+    <select id="f_mode">
+      <option value="comp">Competitive</option>
+      <option value="coop">Cooperative</option>
+      <option value="semi">One vs many</option>
+    </select>
+
+    <label>Mechanics / tags (separated by commas)</label>
+    <input id="f_tags" placeholder="Deck building, Hand management">
+
+    <label>Theme / description</label>
+    <textarea id="f_theme"></textarea>
+
+    <div class="toolbar" style="margin-top:1rem;">
+      <button class="btn btn-primary" id="saveBtn">Save game</button>
+      <button class="btn btn-danger" id="deleteBtn" style="display:none;">Delete game</button>
+    </div>
+    <div class="status" id="formStatus"></div>
+  </div>
+
+  <div class="box" id="ghBox">
+    <h2>GitHub settings</h2>
+    <label style="margin-top:0">Repository (owner/name)</label>
+    <input id="gh_repo" value="mike-huntt/game-list">
+    <div class="row">
+      <div><label>File path</label><input id="gh_path" value="games.json"></div>
+      <div><label>Branch (blank = default)</label><input id="gh_branch" placeholder="main"></div>
+    </div>
+    <label>Access token</label>
+    <input id="gh_token" type="password" placeholder="github_pat_..." autocomplete="off">
+    <label style="display:flex;gap:.4rem;align-items:center;font-weight:500;margin-top:.5rem;"><input type="checkbox" id="gh_remember" style="width:auto;"> Remember token on this computer</label>
+  </div>
+
+</div>
+
+<script>
+let GAMES = [];
+let editingIndex = -1;
+let dirty = false;
+let loadedSha = null;
+
+const $ = id => document.getElementById(id);
+const F = n => $('f_' + n);
+
+function setDirty(v){
+  dirty = v;
+  $('dirtyNote').innerHTML = v ? '<span class="dirty">Unsaved changes &mdash; publish to GitHub or save a json backup.</span>' : '';
+}
+window.addEventListener('beforeunload', e => { if(dirty){ e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- helpers ---------- */
+function classify(mins){ return mins <= 45 ? 'Quick' : (mins >= 120 ? 'Long' : 'Medium'); }
+function fmt(mins){
+  if(mins < 60) return mins + ' mins';
+  const h = Math.round(mins/60*100)/100;
+  return h + ' hour' + (h === 1 ? '' : 's');
+}
+function updatePreview(){
+  const m = parseInt(F('duration').value, 10);
+  $('durPreview').textContent = m ? `Will display as: ${classify(m)} \u00b7 ${fmt(m)}` : '';
+}
+F('duration').addEventListener('input', updatePreview);
+
+// tags: stored with middle dots, edited with commas
+const tagsToInput = t => (t || '').split('\u00b7').map(s => s.trim()).filter(Boolean).join(', ');
+const inputToTags = t => t.split(/[,\u00b7]/).map(s => s.trim()).filter(Boolean).join(' \u00b7 ');
+
+/* ---------- list ---------- */
+function updateSyncButtons(){
+  const has = GAMES.length > 0;
+  $('ghLoad').className = 'btn btn-small ' + (has ? 'btn-secondary' : 'btn-primary');
+  $('ghPublish').className = 'btn btn-small ' + (has ? 'btn-primary' : 'btn-secondary');
+}
+
+function renderList(){
+  updateSyncButtons();
+  $('count').textContent = GAMES.length;
+  const box = $('list');
+  box.innerHTML = '';
+  if(!GAMES.length){
+    box.innerHTML = '<div class="empty">No games loaded yet. Use <b>Load from GitHub</b> (or <b>Load json backup</b>) above, or add a game to start a new list.</div>';
+    return;
+  }
+  GAMES.map((g, i) => ({ g, i }))
+    .sort((a, b) => a.g.name.localeCompare(b.g.name, undefined, { sensitivity: 'base' }))
+    .forEach(({ g, i }) => {
+      const row = document.createElement('div');
+      row.className = 'item' + (i === editingIndex ? ' active' : '');
+      row.textContent = g.name;
+      row.addEventListener('click', () => loadIntoForm(i));
+      box.appendChild(row);
+    });
+}
+
+function clearForm(){
+  editingIndex = -1;
+  ['bgg','name','min','max','best','rating','duration','tags','theme'].forEach(n => F(n).value = '');
+  F('complexity').value = 'simple'; F('mode').value = 'comp';
+  $('formTitle').textContent = 'Add a game';
+  $('deleteBtn').style.display = 'none';
+  $('formStatus').textContent = '';
+  updatePreview(); renderList();
+}
+
+function loadIntoForm(i){
+  const g = GAMES[i];
+  editingIndex = i;
+  F('bgg').value = g.bgg || '';
+  F('name').value = g.name;
+  F('min').value = g.range[0]; F('max').value = g.range[1];
+  F('best').value = (g.best || []).join(',');
+  F('complexity').value = g.complexity;
+  F('rating').value = g.rating;
+  F('duration').value = g.durationMins;
+  F('mode').value = g.mode;
+  F('tags').value = tagsToInput(g.tags);
+  F('theme').value = g.theme;
+  $('formTitle').textContent = 'Edit game';
+  $('deleteBtn').style.display = 'inline-block';
+  $('formStatus').textContent = '';
+  updatePreview(); renderList();
+  if(window.matchMedia('(max-width: 860px)').matches) $('editBox').scrollIntoView({ behavior: 'smooth' });
+}
+
+$('newBtn').addEventListener('click', () => {
+  clearForm();
+  if(window.matchMedia('(max-width: 860px)').matches) $('editBox').scrollIntoView({ behavior: 'smooth' });
+});
+
+$('saveBtn').addEventListener('click', () => {
+  const name = F('name').value.trim();
+  const min = parseInt(F('min').value, 10);
+  const max = parseInt(F('max').value, 10);
+  const dur = parseInt(F('duration').value, 10);
+  if(!name){ alert('Please enter a name.'); return; }
+  if(!min || !max || min > max){ alert('Enter a valid player range (min must not exceed max).'); return; }
+  if(!dur){ alert('Please enter a duration in minutes.'); return; }
+  const best = F('best').value.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+  const outside = best.filter(n => n < min || n > max);
+  if(outside.length && !confirm(`Best count(s) ${outside.join(', ')} fall outside ${min}\u2013${max} players, so they'll never show a star. Save anyway?`)) return;
+  const game = {
+    name, bgg: F('bgg').value.trim(), range: [min, max], best,
+    rating: parseFloat(F('rating').value) || 0,
+    complexity: F('complexity').value, durationMins: dur,
+    mode: F('mode').value, tags: inputToTags(F('tags').value), theme: F('theme').value.trim()
+  };
+  if(editingIndex > -1){ GAMES[editingIndex] = game; }
+  else {
+    const dup = GAMES.findIndex(g => g.name.toLowerCase() === name.toLowerCase());
+    if(dup > -1){
+      if(!confirm(`"${name}" already exists. Overwrite it?`)) return;
+      GAMES[dup] = game; editingIndex = dup;
+    } else { GAMES.push(game); editingIndex = GAMES.length - 1; }
+  }
+  setDirty(true);
+  $('formTitle').textContent = 'Edit game';
+  $('deleteBtn').style.display = 'inline-block';
+  $('formStatus').textContent = 'Saved in this page \u2014 publish to GitHub when you\u2019re done.';
+  renderList();
+});
+
+$('deleteBtn').addEventListener('click', () => {
+  if(editingIndex < 0) return;
+  if(!confirm(`Delete "${GAMES[editingIndex].name}"?`)) return;
+  GAMES.splice(editingIndex, 1);
+  setDirty(true);
+  clearForm();
+});
+
+/* ---------- JSON backup ---------- */
+function loadList(data, sourceLabel){
+  if(!Array.isArray(data)) throw new Error('File is not a list of games.');
+  data.forEach((g, i) => {
+    if(!g.name || !Array.isArray(g.range) || g.range.length !== 2) throw new Error(`Entry ${i+1} is missing a name or a [min,max] range.`);
+  });
+  GAMES = data; setDirty(false); clearForm();
+  ghSay(`Loaded ${data.length} games from ${sourceLabel}.`);
+}
+
+$('openBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  if(dirty && !confirm('You have unsaved changes. Replace them with this file?')){ $('fileInput').value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{ loadList(JSON.parse(reader.result), file.name); }
+    catch(err){ alert("Couldn't read that file: " + err.message); }
+    $('fileInput').value = '';
+  };
+  reader.readAsText(file);
+});
+
+$('downloadBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(GAMES, null, 2) + '\n'], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'games.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+/* ---------- GitHub ---------- */
+const GH = {
+  repo: $('gh_repo'), path: $('gh_path'), branch: $('gh_branch'),
+  token: $('gh_token'), remember: $('gh_remember')
+};
+try{
+  const saved = JSON.parse(localStorage.getItem('mikesGamesGH') || 'null');
+  if(saved){
+    if(saved.repo) GH.repo.value = saved.repo;
+    if(saved.path) GH.path.value = saved.path;
+    if(saved.branch) GH.branch.value = saved.branch;
+    if(saved.token){ GH.token.value = saved.token; GH.remember.checked = true; }
+  }
+}catch(e){}
+function saveGHSettings(){
+  try{
+    localStorage.setItem('mikesGamesGH', JSON.stringify({
+      repo: GH.repo.value.trim(), path: GH.path.value.trim(), branch: GH.branch.value.trim(),
+      token: GH.remember.checked ? GH.token.value.trim() : ''
+    }));
+  }catch(e){}
+}
+function updateSiteLink(){
+  const m = GH.repo.value.trim().match(/^([^\/\s]+)\/([^\/\s]+)$/);
+  $('openSite').href = m ? `https://${m[1].toLowerCase()}.github.io/${m[2]}/` : '#';
+}
+[GH.repo, GH.path, GH.branch, GH.token].forEach(el => el.addEventListener('change', saveGHSettings));
+GH.remember.addEventListener('change', saveGHSettings);
+GH.repo.addEventListener('input', updateSiteLink);
+updateSiteLink();
+
+function ghSay(msg, bad){ $('ghStatus').textContent = msg; $('ghStatus').style.color = bad ? '#a6532e' : ''; }
+function ghUrl(){
+  const repo = GH.repo.value.trim(), path = GH.path.value.trim();
+  if(!/^[^\/\s]+\/[^\/\s]+$/.test(repo)) throw new Error('Repository should look like owner/name.');
+  if(!path) throw new Error('Enter the file path (games.json) in GitHub settings.');
+  const b = GH.branch.value.trim();
+  return `https://api.github.com/repos/${repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}` + (b ? `?ref=${encodeURIComponent(b)}` : '');
+}
+function ghHeaders(){
+  const h = { 'Accept': 'application/vnd.github+json' };
+  const t = GH.token.value.trim();
+  if(t) h['Authorization'] = 'Bearer ' + t;
+  return h;
+}
+const toB64 = str => btoa(unescape(encodeURIComponent(str)));
+const fromB64 = b64 => decodeURIComponent(escape(atob(b64.replace(/\s/g,''))));
+
+async function ghGetFile(){
+  const res = await fetch(ghUrl(), { headers: ghHeaders(), cache: 'no-store' });
+  if(res.status === 404) return null;
+  if(!res.ok) throw new Error(`GitHub said ${res.status} ${res.statusText}. ` + (res.status === 401 || res.status === 403 ? 'Check the token in GitHub settings.' : ''));
+  return res.json();
+}
+
+$('ghLoad').addEventListener('click', async () => {
+  if(dirty && !confirm('You have unsaved changes. Replace them with the list currently on GitHub?')) return;
+  saveGHSettings();
+  ghSay('Loading\u2026');
+  try{
+    const file = await ghGetFile();
+    if(!file) throw new Error('File not found in that repository.');
+    const data = JSON.parse(fromB64(file.content));
+    loadList(data, 'GitHub');
+    loadedSha = file.sha;
+  }catch(e){ ghSay(e.message, true); }
+});
+
+$('ghPublish').addEventListener('click', async () => {
+  if(!GAMES.length){ ghSay('The list is empty \u2014 load your games first so you don\u2019t wipe the live site.', true); return; }
+  if(!GH.token.value.trim()){ ghSay('Paste your access token in GitHub settings first.', true); return; }
+  saveGHSettings();
+  ghSay('Publishing\u2026');
+  try{
+    const current = await ghGetFile();
+    if(current && loadedSha && current.sha !== loadedSha &&
+       !confirm('games.json on GitHub has changed since you loaded it. Overwrite it with this version?')){
+      ghSay('Cancelled \u2014 use "Load from GitHub" to get the latest version first.', true); return;
+    }
+    if(current && !loadedSha &&
+       !confirm('You haven\u2019t loaded the current list from GitHub in this session. Overwrite what\u2019s online with this version?')){
+      ghSay('Cancelled.', true); return;
+    }
+    const body = {
+      message: 'Update game list',
+      content: toB64(JSON.stringify(GAMES, null, 2) + '\n')
+    };
+    if(current) body.sha = current.sha;
+    const b = GH.branch.value.trim(); if(b) body.branch = b;
+    const res = await fetch(ghUrl().split('?')[0], {
+      method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      let detail = ''; try{ detail = (await res.json()).message; }catch(_){}
+      throw new Error(`GitHub said ${res.status}. ${detail || ''} ` + (res.status === 401 || res.status === 403 || res.status === 404 ? 'Check the token, repository name and Contents: Read and write permission.' : ''));
+    }
+    const out = await res.json();
+    loadedSha = out.content.sha; setDirty(false);
+    ghSay('Published. The live site updates in a minute or two.');
+  }catch(e){ ghSay(e.message, true); }
+});
+
+clearForm();
+</script>
+</body>
+</html>
