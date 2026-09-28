@@ -566,7 +566,24 @@
     "complexity": "complex",
     "durationMins": 180,
     "mode": "coop",
-    "tags": "Real-time · Digital app required",
+    "tags": "Real-time · Digital app",
     "theme": "You are humanity's last hope to resist an extra-terrestrial invasion. Launch fighters to shoot down UFOs, assign soldiers to key missions, research alien technology, and defend your base, all while trying to keep the world from collapsing."
+  },
+  {
+    "name": "Concordia",
+    "bgg": "https://boardgamegeek.com/boardgame/124361/concordia",
+    "range": [
+      2,
+      5
+    ],
+    "best": [
+      4
+    ],
+    "rating": 8.1,
+    "complexity": "complex",
+    "durationMins": 150,
+    "mode": "comp",
+    "tags": "Hand management · Set collection · Network building",
+    "theme": "Merchants build and trade throughout the Roman Empire to please the ancient Gods."
   }
 ]
