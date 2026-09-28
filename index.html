@@ -76,10 +76,11 @@
   .b-coop{ background:#d8e8ea; color:#1f5c62; }
   .b-comp{ background:#efd9df; color:#7a2b45; }
   .b-semi{ background:#e6dfce; color:#5f5230; }
-  .dots{ letter-spacing:.1em; }
-  .bottom-block{ margin-top:auto; display:flex; flex-direction:column; gap:.55rem; }
-  .tags{ font-size:.83rem; color:#4b4535; }
-  .theme{ font-size:.86rem; color:#4e4835; font-style:italic; line-height:1.45; border-bottom:1px dashed var(--line); padding-bottom:.55rem; }
+  .dots{ display:inline-flex; gap:.18em; align-items:center; }
+  .dot{ width:.62em; height:.62em; border-radius:50%; border:.11em solid currentColor; box-sizing:border-box; display:inline-block; }
+  .dot.on{ background:currentColor; }
+  .theme{ font-size:.86rem; color:#4e4835; font-style:italic; line-height:1.45; }
+  .tags{ font-size:.83rem; color:#4b4535; margin-top:auto; border-top:1px dashed var(--line); padding-top:.55rem; }
 
   .status{
     max-width:40rem; margin: 2rem auto; padding: 1rem 1.2rem; text-align:center;
@@ -101,7 +102,13 @@
 const DATA_URL = "games.json";
 
 const MODE_LABEL = {coop:["Cooperative","b-coop"], comp:["Competitive","b-comp"], semi:["One vs many","b-semi"]};
-const COMPLEXITY_DOTS = {simple:"\u25cf\u25cb\u25cb\u25cb", medium:"\u25cf\u25cf\u25cb\u25cb", complex:"\u25cf\u25cf\u25cf\u25cb", verycomplex:"\u25cf\u25cf\u25cf\u25cf"};
+const COMPLEXITY_LEVEL = {simple:1, medium:2, complex:3, verycomplex:4};
+function dotsHTML(c){
+  const n = COMPLEXITY_LEVEL[c] || 1;
+  let h = '';
+  for(let i=1;i<=4;i++) h += `<span class="dot${i<=n?' on':''}"></span>`;
+  return `<span class="dots" aria-hidden="true">${h}</span>`;
+}
 const COMPLEXITY_CLASS = {simple:"b-simple", medium:"b-medium", complex:"b-complex", verycomplex:"b-verycomplex"};
 const COMPLEXITY_LABEL = {simple:"simple", medium:"medium", complex:"complex", verycomplex:"very complex"};
 const TIME_CLASS = {quick:"b-time-quick", medium:"b-time-medium", long:"b-time-long"};
@@ -144,14 +151,12 @@ function cardHTML(g, count){
     ${isBest ? `<span class="star" title="Best at this count">\u2605</span>` : ''}
     <h3>${nameHTML}</h3>
     <div class="badges">
-      <span class="badge ${COMPLEXITY_CLASS[g.complexity]}"><span class="dots">${COMPLEXITY_DOTS[g.complexity]}</span> ${COMPLEXITY_LABEL[g.complexity]}</span>
+      <span class="badge ${COMPLEXITY_CLASS[g.complexity]}">${dotsHTML(g.complexity)} ${COMPLEXITY_LABEL[g.complexity]}</span>
       <span class="badge ${TIME_CLASS[dur.category]}">${TIME_LABEL[dur.category]} \u00b7 ${dur.text}</span>
       <span class="badge ${modeClass}">${modeLabel}</span>
     </div>
-    <div class="bottom-block">
-      <div class="theme">${esc(g.theme)}</div>
-      <div class="tags">${esc(g.tags)}</div>
-    </div>
+    <div class="theme">${esc(g.theme)}</div>
+    <div class="tags">${esc(g.tags)}</div>
   </article>`;
 }
 
